@@ -12,7 +12,9 @@ export default function AuctionCreate() {
 
   // Form State
   const [pickup, setPickup] = useState('');
+  const [pickupPostalCode, setPickupPostalCode] = useState('');
   const [destination, setDestination] = useState('');
+  const [destinationPostalCode, setDestinationPostalCode] = useState('');
   const [distance, setDistance] = useState('');
   const [vehicleType, setVehicleType] = useState('');
   const [vehicleCapacity, setVehicleCapacity] = useState('');
@@ -71,7 +73,9 @@ export default function AuctionCreate() {
     try {
       const payload = {
         pickup_location: pickup,
+        pickup_postal_code: pickupPostalCode || null,
         destination: destination,
+        destination_postal_code: destinationPostalCode || null,
         distance_km: distance ? parseFloat(distance) : null,
         vehicle_type: vehicleType,
         vehicle_capacity: vehicleCapacity || null,
@@ -126,11 +130,11 @@ export default function AuctionCreate() {
               </div>
               <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div className="form-group">
-                  <label className="form-label">Pickup Location (Kha se) *</label>
+                  <label className="form-label">Pickup Location (Exact Address) *</label>
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="e.g. Mumbai Warehouse"
+                    placeholder="e.g. Plot 42, Phase II, Okhla, New Delhi"
                     value={pickup} 
                     onChange={(e) => setPickup(e.target.value)} 
                     required 
@@ -138,13 +142,37 @@ export default function AuctionCreate() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Destination Location (Kha jana hai) *</label>
+                  <label className="form-label">Pickup PIN Code (Postal Code) *</label>
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="e.g. Delhi Hub"
+                    placeholder="e.g. 110020"
+                    value={pickupPostalCode} 
+                    onChange={(e) => setPickupPostalCode(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Destination Location (Exact Address) *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. Shed 3, Sector 4, Gandhinagar"
                     value={destination} 
                     onChange={(e) => setDestination(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Destination PIN Code (Postal Code) *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. 382010"
+                    value={destinationPostalCode} 
+                    onChange={(e) => setDestinationPostalCode(e.target.value)} 
                     required 
                   />
                 </div>

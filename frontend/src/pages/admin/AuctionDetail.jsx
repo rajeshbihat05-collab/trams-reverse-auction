@@ -93,7 +93,7 @@ export default function AuctionDetail() {
             <h1 className="page-title">{auction.auction_number}</h1>
             <span className={`badge badge-${auction.status}`}>{auction.status}</span>
           </div>
-          <p className="page-subtitle">Route: {auction.pickup_location} &rarr; {auction.destination}</p>
+          <p className="page-subtitle">Route: {auction.pickup_location} {auction.pickup_postal_code ? `(PIN: ${auction.pickup_postal_code})` : ''} &rarr; {auction.destination} {auction.destination_postal_code ? `(PIN: ${auction.destination_postal_code})` : ''}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {auction.status === 'draft' && (
