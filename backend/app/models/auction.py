@@ -45,7 +45,7 @@ class Auction(Base):
     distance_km = Column(Float, nullable=True)
 
     # Vehicle requirements
-    vehicle_type = Column(String(100), nullable=False)
+    vehicle_type = Column(String(100), nullable=True)
     vehicle_capacity = Column(String(50), nullable=True)
     vehicle_length = Column(String(50), nullable=True)
     vehicle_width = Column(String(50), nullable=True)
@@ -55,7 +55,7 @@ class Auction(Base):
     expected_weight = Column(Float, nullable=True)
 
     # Schedule
-    loading_date = Column(DateTime, nullable=False)
+    loading_date = Column(DateTime, nullable=True)
     reporting_time = Column(String(10), nullable=True)
     unloading_point = Column(String(500), nullable=True)
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/client';
-import { Gavel, Save, ArrowLeft } from 'lucide-react';
+import { Gavel, Play, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function AuctionCreate() {
   const navigate = useNavigate();
@@ -29,6 +29,7 @@ export default function AuctionCreate() {
   const [termsConditions, setTermsConditions] = useState('');
   const [autoNotify, setAutoNotify] = useState(true);
   const [selectedTransporters, setSelectedTransporters] = useState([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     const fetchMasters = async () => {
@@ -107,33 +108,29 @@ export default function AuctionCreate() {
             <ArrowLeft size={16} /> Back to List
           </button>
           <h1 className="page-title">Create Transport Auction</h1>
-          <p className="page-subtitle">Publish a cargo/freight requirement and invite registered transporters to bid.</p>
+          <p className="page-subtitle">Publish a cargo/freight requirement and invite registered transporters to bid instantly.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="form">
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {/* Required details card */}
             <div className="card">
-              <div className="card-header">
-                <span className="card-title">Transport Details</span>
+              <div className="card-header" style={{ borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="card-title" style={{ color: 'var(--primary)', fontWeight: 600 }}>Required Details</span>
+                <span className="badge badge-live" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--danger)', display: 'inline-block' }}></span>
+                  Will Start Live Instantly
+                </span>
               </div>
               <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label className="form-label">Predefined Route Helper</label>
-                  <select className="form-select" onChange={(e) => handleRouteSelect(e.target.value)}>
-                    <option value="">-- Select a Route to Prefill --</option>
-                    {routes.map(r => (
-                      <option key={r.id} value={r.id}>{r.origin} &rarr; {r.destination} ({r.distance_km} km)</option>
-                    ))}
-                  </select>
-                </div>
-
                 <div className="form-group">
-                  <label className="form-label">Pickup Location *</label>
+                  <label className="form-label">Pickup Location (Kha se) *</label>
                   <input 
                     type="text" 
                     className="form-input" 
+                    placeholder="e.g. Mumbai Warehouse"
                     value={pickup} 
                     onChange={(e) => setPickup(e.target.value)} 
                     required 
@@ -141,10 +138,11 @@ export default function AuctionCreate() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Destination Location *</label>
+                  <label className="form-label">Destination Location (Kha jana hai) *</label>
                   <input 
                     type="text" 
                     className="form-input" 
+                    placeholder="e.g. Delhi Hub"
                     value={destination} 
                     onChange={(e) => setDestination(e.target.value)} 
                     required 
@@ -152,48 +150,11 @@ export default function AuctionCreate() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Distance (km)</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    value={distance} 
-                    onChange={(e) => setDistance(e.target.value)} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Unloading Specific Point</label>
+                  <label className="form-label">Material Description (Material kya hai) *</label>
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="e.g. Warehouse 3B" 
-                    value={unloadingPoint} 
-                    onChange={(e) => setUnloadingPoint(e.target.value)} 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Material & Vehicle Specifications</span>
-              </div>
-              <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
-                  <label className="form-label">Material Category Prefill</label>
-                  <select className="form-select" onChange={(e) => handleMaterialSelect(e.target.value)}>
-                    <option value="">-- Select Material --</option>
-                    {materials.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Material Description *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
+                    placeholder="e.g. Steel Coils, FMCG"
                     value={materialType} 
                     onChange={(e) => setMaterialType(e.target.value)} 
                     required 
@@ -201,90 +162,19 @@ export default function AuctionCreate() {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Expected Cargo Weight (MT)</label>
+                  <label className="form-label">Expected Cargo Weight in MT (Kitna weight hai) *</label>
                   <input 
                     type="number" 
                     step="0.01" 
                     className="form-input" 
+                    placeholder="e.g. 15.5"
                     value={expectedWeight} 
                     onChange={(e) => setExpectedWeight(e.target.value)} 
+                    required
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Vehicle Type Required *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g. 32 Ft Container, Tata Ace" 
-                    value={vehicleType} 
-                    onChange={(e) => setVehicleType(e.target.value)} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Vehicle Capacity / Specification</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g. 16 MT Max capacity" 
-                    value={vehicleCapacity} 
-                    onChange={(e) => setVehicleCapacity(e.target.value)} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Required Length</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g. 32 Ft, 20 Ft" 
-                    value={vehicleLength} 
-                    onChange={(e) => setVehicleLength(e.target.value)} 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Required Width</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="e.g. 8 Ft, 8.5 Ft" 
-                    value={vehicleWidth} 
-                    onChange={(e) => setVehicleWidth(e.target.value)} 
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header">
-                <span className="card-title">Schedule & Rules</span>
-              </div>
-              <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div className="form-group">
-                  <label className="form-label">Loading Date *</label>
-                  <input 
-                    type="date" 
-                    className="form-input" 
-                    value={loadingDate} 
-                    onChange={(e) => setLoadingDate(e.target.value)} 
-                    required 
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Reporting Time</label>
-                  <input 
-                    type="time" 
-                    className="form-input" 
-                    value={reportingTime} 
-                    onChange={(e) => setReportingTime(e.target.value)} 
-                  />
-                </div>
-
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label className="form-label">Auction Closing Date & Time *</label>
                   <input 
                     type="datetime-local" 
@@ -294,36 +184,174 @@ export default function AuctionCreate() {
                     required 
                   />
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label">Reserve Price / Max Acceptable Bid (₹)</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    placeholder="Optional reserve price limit" 
-                    value={reservePrice} 
-                    onChange={(e) => setReservePrice(e.target.value)} 
-                  />
-                </div>
-
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label className="form-label">Special Delivery / Transportation Instructions</label>
-                  <textarea 
-                    className="form-textarea" 
-                    value={specialInstructions} 
-                    onChange={(e) => setSpecialInstructions(e.target.value)} 
-                  />
-                </div>
-
-                <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                  <label className="form-label">Contract terms and conditions</label>
-                  <textarea 
-                    className="form-textarea" 
-                    value={termsConditions} 
-                    onChange={(e) => setTermsConditions(e.target.value)} 
-                  />
-                </div>
               </div>
+            </div>
+
+            {/* Advanced Specifications Accordion Toggle */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button 
+                type="button" 
+                className="btn btn-secondary w-full"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  padding: '12px 16px',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 14
+                }}
+              >
+                <span>Optional Advanced Specifications</span>
+                {showAdvanced ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+
+              {showAdvanced && (
+                <div className="card animate-fade-in" style={{ marginTop: 4 }}>
+                  <div className="card-header">
+                    <span className="card-title">Advanced Configuration</span>
+                  </div>
+                  <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="form-label">Predefined Route Helper (Optional)</label>
+                      <select className="form-select" onChange={(e) => handleRouteSelect(e.target.value)}>
+                        <option value="">-- Select a Route to Prefill --</option>
+                        {routes.map(r => (
+                          <option key={r.id} value={r.id}>{r.origin} &rarr; {r.destination} ({r.distance_km} km)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Distance (km)</label>
+                      <input 
+                        type="number" 
+                        className="form-input" 
+                        value={distance} 
+                        onChange={(e) => setDistance(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Unloading Specific Point</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. Warehouse 3B" 
+                        value={unloadingPoint} 
+                        onChange={(e) => setUnloadingPoint(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Material Category Prefill</label>
+                      <select className="form-select" onChange={(e) => handleMaterialSelect(e.target.value)}>
+                        <option value="">-- Select Material --</option>
+                        {materials.map(m => (
+                          <option key={m.id} value={m.id}>{m.name} ({m.category})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Vehicle Type Required</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. 32 Ft Container" 
+                        value={vehicleType} 
+                        onChange={(e) => setVehicleType(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Vehicle Capacity / Specification</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. 16 MT Max capacity" 
+                        value={vehicleCapacity} 
+                        onChange={(e) => setVehicleCapacity(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Required Length</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. 32 Ft" 
+                        value={vehicleLength} 
+                        onChange={(e) => setVehicleLength(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Required Width</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. 8 Ft" 
+                        value={vehicleWidth} 
+                        onChange={(e) => setVehicleWidth(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Loading Date</label>
+                      <input 
+                        type="date" 
+                        className="form-input" 
+                        value={loadingDate} 
+                        onChange={(e) => setLoadingDate(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Reporting Time</label>
+                      <input 
+                        type="time" 
+                        className="form-input" 
+                        value={reportingTime} 
+                        onChange={(e) => setReportingTime(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="form-label">Reserve Price / Max Acceptable Bid (₹)</label>
+                      <input 
+                        type="number" 
+                        className="form-input" 
+                        placeholder="Optional reserve price limit" 
+                        value={reservePrice} 
+                        onChange={(e) => setReservePrice(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="form-label">Special Delivery / Transportation Instructions</label>
+                      <textarea 
+                        className="form-textarea" 
+                        value={specialInstructions} 
+                        onChange={(e) => setSpecialInstructions(e.target.value)} 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                      <label className="form-label">Contract terms and conditions</label>
+                      <textarea 
+                        className="form-textarea" 
+                        value={termsConditions} 
+                        onChange={(e) => setTermsConditions(e.target.value)} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -391,9 +419,9 @@ export default function AuctionCreate() {
               type="submit" 
               className="btn btn-primary btn-lg w-full" 
               disabled={loading}
-              style={{ justifyContent: 'center' }}
+              style={{ justifyContent: 'center', backgroundColor: '#16a34a', borderColor: '#16a34a' }}
             >
-              <Save size={18} /> {loading ? 'Creating...' : 'Save & Prepare Auction'}
+              <Play size={18} style={{ marginRight: 8 }} /> {loading ? 'Starting Live Auction...' : 'Create & Start Live Auction'}
             </button>
           </div>
         </div>

@@ -13,13 +13,13 @@ class AuctionCreate(BaseModel):
     destination: str = Field(..., min_length=2)
     destination_postal_code: Optional[str] = None
     distance_km: Optional[float] = None
-    vehicle_type: str = Field(..., min_length=2)
+    vehicle_type: Optional[str] = None
     vehicle_capacity: Optional[str] = None
     vehicle_length: Optional[str] = None
     vehicle_width: Optional[str] = None
     material_type: str = Field(..., min_length=2)
     expected_weight: Optional[float] = None
-    loading_date: datetime
+    loading_date: Optional[datetime] = None
     reporting_time: Optional[str] = None
     unloading_point: Optional[str] = None
     closing_time: datetime

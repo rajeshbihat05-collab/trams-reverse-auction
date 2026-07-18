@@ -165,6 +165,10 @@ async def create_auction(
     current_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db),
 ):
+    from datetime import timedelta
+    now_utc = datetime.now(timezone.utc)
+    loading_val = data.loading_date or (now_utc + timedelta(days=3))
+
     auction = Auction(
         auction_number=generate_auction_number(),
         created_by=current_user.id,
@@ -173,13 +177,13 @@ async def create_auction(
         destination=data.destination,
         destination_postal_code=data.destination_postal_code,
         distance_km=data.distance_km,
-        vehicle_type=data.vehicle_type,
+        vehicle_type=data.vehicle_type or "General Truck",
         vehicle_capacity=data.vehicle_capacity,
         vehicle_length=data.vehicle_length,
         vehicle_width=data.vehicle_width,
         material_type=data.material_type,
         expected_weight=data.expected_weight,
-        loading_date=data.loading_date,
+        loading_date=loading_val,
         reporting_time=data.reporting_time,
         unloading_point=data.unloading_point,
         closing_time=data.closing_time,
@@ -187,7 +191,8 @@ async def create_auction(
         special_instructions=data.special_instructions,
         terms_conditions=data.terms_conditions,
         auto_notify=data.auto_notify,
-        status=AuctionStatus.DRAFT.value,
+        status=AuctionStatus.LIVE.value,
+        start_time=now_utc,
     )
     db.add(auction)
     db.flush()
@@ -196,12 +201,43 @@ async def create_auction(
         invite = AuctionInvite(auction_id=auction.id, transporter_id=tid)
         db.add(invite)
 
+    # Send notifications to all invited transporters instantly
+    if auction.auto_notify:
+        for tid in data.invited_transporter_ids:
+            transporter = db.query(Transporter).filter(Transporter.id == tid).first()
+            if transporter:
+                message_text = f"You are invited to bid on auction {auction.auction_number}. Route: {auction.pickup_location} to {auction.destination}. Material: {auction.material_type}. Closing: {auction.closing_time.strftime('%d/%m/%Y %H:%M')}"
+                notification = Notification(
+                    user_id=transporter.user_id,
+                    title=f"New Auction: {auction.auction_number}",
+                    message=message_text,
+                    type="auction_live",
+                    reference_id=auction.id,
+                    reference_type="auction",
+                )
+                db.add(notification)
+
+                # Send email and WhatsApp
+                t_user = db.query(User).filter(User.id == transporter.user_id).first()
+                if t_user:
+                    if t_user.email:
+                        send_email_notification(
+                            t_user.email,
+                            f"New Auction Invitation: {auction.auction_number}",
+                            message_text
+                        )
+                    if t_user.phone:
+                        send_whatsapp_notification(
+                            t_user.phone,
+                            f"New Auction: {auction.auction_number}\nRoute: {auction.pickup_location} to {auction.destination}\nClosing: {auction.closing_time.strftime('%d/%m/%Y %H:%M')}"
+                        )
+
     db.commit()
     db.refresh(auction)
 
     log_audit(
         db, current_user.id, "CREATE_AUCTION", "auction", auction.id,
-        f"Created auction {auction.auction_number}",
+        f"Created and published live auction {auction.auction_number}",
         ip_address=request.client.host if request.client else None,
     )
 
