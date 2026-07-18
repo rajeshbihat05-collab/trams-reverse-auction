@@ -48,8 +48,8 @@ class User(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     # Relationships
-    transporter = relationship("Transporter", back_populates="user", uselist=False)
-    notifications = relationship("Notification", back_populates="user")
+    transporter = relationship("Transporter", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="user")
 
     def __repr__(self):

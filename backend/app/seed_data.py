@@ -257,6 +257,7 @@ def seed_database(db):
         {
             "pickup": "Mumbai, Maharashtra", "dest": "Delhi, NCR",
             "dist": 1420, "vehicle": "Tata LPT 1613", "capacity": "16 MT",
+            "length": "32 Ft", "width": "8 Ft",
             "material": "Steel Coils", "weight": 15.0,
             "loading": now + timedelta(days=3), "closing": now + timedelta(hours=48),
             "reserve": 85000, "status": "live",
@@ -265,6 +266,7 @@ def seed_database(db):
         {
             "pickup": "Pune, Maharashtra", "dest": "Nashik, Maharashtra",
             "dist": 210, "vehicle": "Eicher Pro 1110", "capacity": "5 MT",
+            "length": "20 Ft", "width": "7.5 Ft",
             "material": "FMCG Products", "weight": 4.5,
             "loading": now + timedelta(days=2), "closing": now + timedelta(hours=24),
             "reserve": 18000, "status": "live",
@@ -273,6 +275,7 @@ def seed_database(db):
         {
             "pickup": "Delhi, NCR", "dest": "Jaipur, Rajasthan",
             "dist": 280, "vehicle": "Tata 407", "capacity": "3.5 MT",
+            "length": "14 Ft", "width": "7 Ft",
             "material": "Electronic Components", "weight": 2.0,
             "loading": now + timedelta(days=1), "closing": now - timedelta(hours=2),
             "reserve": 15000, "status": "closed",
@@ -281,6 +284,7 @@ def seed_database(db):
         {
             "pickup": "Hyderabad, Telangana", "dest": "Bangalore, Karnataka",
             "dist": 570, "vehicle": "Bharat Benz 1217", "capacity": "12 MT",
+            "length": "24 Ft", "width": "8 Ft",
             "material": "Cement Bags", "weight": 11.0,
             "loading": now + timedelta(days=5), "closing": now + timedelta(hours=72),
             "reserve": 35000, "status": "published",
@@ -289,6 +293,7 @@ def seed_database(db):
         {
             "pickup": "Ludhiana, Punjab", "dest": "Delhi, NCR",
             "dist": 310, "vehicle": "Tata Prima 4928", "capacity": "25 MT",
+            "length": "40 Ft", "width": "8.5 Ft",
             "material": "Textile Rolls", "weight": 20.0,
             "loading": now - timedelta(days=5), "closing": now - timedelta(days=4),
             "reserve": 45000, "status": "awarded",
@@ -306,6 +311,8 @@ def seed_database(db):
             distance_km=ac["dist"],
             vehicle_type=ac["vehicle"],
             vehicle_capacity=ac["capacity"],
+            vehicle_length=ac.get("length"),
+            vehicle_width=ac.get("width"),
             material_type=ac["material"],
             expected_weight=ac["weight"],
             loading_date=ac["loading"],

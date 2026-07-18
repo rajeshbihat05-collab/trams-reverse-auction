@@ -16,6 +16,8 @@ export default function AuctionCreate() {
   const [distance, setDistance] = useState('');
   const [vehicleType, setVehicleType] = useState('');
   const [vehicleCapacity, setVehicleCapacity] = useState('');
+  const [vehicleLength, setVehicleLength] = useState('');
+  const [vehicleWidth, setVehicleWidth] = useState('');
   const [materialType, setMaterialType] = useState('');
   const [expectedWeight, setExpectedWeight] = useState('');
   const [loadingDate, setLoadingDate] = useState('');
@@ -72,6 +74,8 @@ export default function AuctionCreate() {
         distance_km: distance ? parseFloat(distance) : null,
         vehicle_type: vehicleType,
         vehicle_capacity: vehicleCapacity || null,
+        vehicle_length: vehicleLength || null,
+        vehicle_width: vehicleWidth || null,
         material_type: materialType,
         expected_weight: expectedWeight ? parseFloat(expectedWeight) : null,
         loading_date: new Date(loadingDate).toISOString(),
@@ -227,6 +231,28 @@ export default function AuctionCreate() {
                     placeholder="e.g. 16 MT Max capacity" 
                     value={vehicleCapacity} 
                     onChange={(e) => setVehicleCapacity(e.target.value)} 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Required Length</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. 32 Ft, 20 Ft" 
+                    value={vehicleLength} 
+                    onChange={(e) => setVehicleLength(e.target.value)} 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Required Width</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="e.g. 8 Ft, 8.5 Ft" 
+                    value={vehicleWidth} 
+                    onChange={(e) => setVehicleWidth(e.target.value)} 
                   />
                 </div>
               </div>

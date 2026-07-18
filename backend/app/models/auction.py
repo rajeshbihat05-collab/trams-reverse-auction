@@ -47,6 +47,8 @@ class Auction(Base):
     # Vehicle requirements
     vehicle_type = Column(String(100), nullable=False)
     vehicle_capacity = Column(String(50), nullable=True)
+    vehicle_length = Column(String(50), nullable=True)
+    vehicle_width = Column(String(50), nullable=True)
 
     # Material details
     material_type = Column(String(200), nullable=False)

@@ -15,6 +15,8 @@ class AuctionCreate(BaseModel):
     distance_km: Optional[float] = None
     vehicle_type: str = Field(..., min_length=2)
     vehicle_capacity: Optional[str] = None
+    vehicle_length: Optional[str] = None
+    vehicle_width: Optional[str] = None
     material_type: str = Field(..., min_length=2)
     expected_weight: Optional[float] = None
     loading_date: datetime
@@ -36,6 +38,8 @@ class AuctionUpdate(BaseModel):
     distance_km: Optional[float] = None
     vehicle_type: Optional[str] = None
     vehicle_capacity: Optional[str] = None
+    vehicle_length: Optional[str] = None
+    vehicle_width: Optional[str] = None
     material_type: Optional[str] = None
     expected_weight: Optional[float] = None
     loading_date: Optional[datetime] = None
@@ -60,6 +64,8 @@ class AuctionResponse(BaseModel):
     distance_km: Optional[float] = None
     vehicle_type: str
     vehicle_capacity: Optional[str] = None
+    vehicle_length: Optional[str] = None
+    vehicle_width: Optional[str] = None
     material_type: str
     expected_weight: Optional[float] = None
     loading_date: datetime

@@ -143,6 +143,14 @@ export default function AuctionDetail() {
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{auction.vehicle_capacity || 'N/A'}</div>
               </div>
               <div>
+                <label className="form-label" style={{ marginBottom: 2 }}>Required Length</label>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{auction.vehicle_length || 'N/A'}</div>
+              </div>
+              <div>
+                <label className="form-label" style={{ marginBottom: 2 }}>Required Width</label>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{auction.vehicle_width || 'N/A'}</div>
+              </div>
+              <div>
                 <label className="form-label" style={{ marginBottom: 2 }}>Loading Date</label>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{new Date(auction.loading_date).toLocaleDateString('en-IN')}</div>
               </div>

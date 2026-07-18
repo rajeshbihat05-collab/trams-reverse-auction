@@ -290,3 +290,51 @@ async def delete_driver(
     db.delete(driver)
     db.commit()
     return MessageResponse(message="Driver deleted")
+
+
+@router.delete("/{transporter_id}", response_model=MessageResponse)
+async def delete_transporter(
+    transporter_id: str,
+    request: Request,
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    from app.models.audit import AuditLog
+    from app.models.bid import AuctionResult
+
+    t = db.query(Transporter).filter(Transporter.id == transporter_id).first()
+    if not t:
+        raise NotFoundException("Transporter not found")
+
+    # Check if transporter has won any auctions to prevent database constraint error
+    has_won = db.query(AuctionResult).filter(AuctionResult.winner_id == transporter_id).first()
+    if has_won:
+        raise ConflictException(
+            f"Cannot delete transporter '{t.company_name}' because they have won one or more auctions. "
+            "Please deactivate their account instead."
+        )
+
+    company_name = t.company_name
+    user_id = t.user_id
+
+    # Nullify user_id in audit logs to prevent foreign key errors
+    db.query(AuditLog).filter(AuditLog.user_id == user_id).update({AuditLog.user_id: None})
+
+    # Delete the associated user which will cascade delete the transporter record
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        db.delete(user)
+    else:
+        db.delete(t)
+
+    db.commit()
+
+    log_audit(
+        db, current_user.id, "DELETE_TRANSPORTER", "transporter", transporter_id,
+        f"Deleted transporter {company_name}",
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return MessageResponse(message=f"Transporter {company_name} deleted successfully")
+
+
