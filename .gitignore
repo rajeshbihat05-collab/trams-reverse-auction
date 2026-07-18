@@ -1,0 +1,23 @@
+# Python virtual environment
+backend/venv/
+**/__pycache__/
+*.pyc
+
+# Environment files and databases
+.env
+backend/.env
+frontend/.env
+backend/trams.db
+backend/trams.db-journal
+backend/trams.db-shm
+backend/trams.db-wal
+backend/uploads/
+
+# Node dependencies and build files
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# OS files
+.DS_Store
+Thumbs.db

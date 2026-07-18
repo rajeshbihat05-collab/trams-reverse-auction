@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trams_backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://trams_user:trams_pass@db:5432/trams_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JWT_SECRET_KEY=trams-production-secure-key-2026-super-secret
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - uploads_volume:/app/uploads
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: trams_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:15-alpine
+    container_name: trams_db
+    restart: always
+    environment:
+      - POSTGRES_USER=trams_user
+      - POSTGRES_PASSWORD=trams_pass
+      - POSTGRES_DB=trams_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trams_user -d trams_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: trams_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+  uploads_volume:
