@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 100
 
     # CORS
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost"
+    CORS_ORIGINS: str = "*"
 
     # Company Defaults
     DEFAULT_CURRENCY: str = "INR"
