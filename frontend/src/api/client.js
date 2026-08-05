@@ -1,6 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+let API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  if (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('onrender.com'))) {
+    API_BASE_URL = 'https://trams-reverse-auction.onrender.com/api';
+  } else {
+    API_BASE_URL = '/api';
+  }
+}
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -26,7 +34,7 @@ api.interceptors.response.use(
 
       if (refreshToken) {
         try {
-          const res = await axios.post('/api/auth/refresh-token', {
+          const res = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
             refresh_token: refreshToken,
           });
           localStorage.setItem('access_token', res.data.access_token);

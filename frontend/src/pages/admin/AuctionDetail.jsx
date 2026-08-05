@@ -91,9 +91,13 @@ export default function AuctionDetail() {
     const token = localStorage.getItem('access_token');
     if (!token) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/auction/${id}?token=${token}`;
+    let wsUrl = '';
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      wsUrl = `wss://trams-reverse-auction.onrender.com/ws/auction/${id}?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws/auction/${id}?token=${token}`;
+    }
 
     const socket = new WebSocket(wsUrl);
 
