@@ -74,6 +74,7 @@ async def login(data: LoginRequest, request: Request, db: Session = Depends(get_
             avatar_url=user.avatar_url,
             transporter_id=transporter_id,
             company_name=company_name,
+            must_change_password=getattr(user, 'must_change_password', False),
         ),
     )
 
@@ -215,6 +216,24 @@ async def change_password(
     return MessageResponse(message="Password changed successfully")
 
 
+@router.post("/force-change-password", response_model=MessageResponse)
+async def force_change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.password_hash = hash_password(data.new_password)
+    current_user.must_change_password = False
+    db.commit()
+
+    log_audit(
+        db, current_user.id, "FORCE_CHANGE_PASSWORD", "user", current_user.id,
+        f"User {current_user.email} set new personal password after admin reset"
+    )
+
+    return MessageResponse(message="New personal password set successfully!")
+
+
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
     current_user: User = Depends(get_current_user),
@@ -242,4 +261,5 @@ async def get_me(current_user: User = Depends(get_current_user)):
         avatar_url=current_user.avatar_url,
         transporter_id=transporter_id,
         company_name=company_name,
+        must_change_password=getattr(current_user, 'must_change_password', False),
     )

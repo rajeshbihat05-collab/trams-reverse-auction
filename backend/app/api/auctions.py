@@ -2,7 +2,7 @@
 Auction CRUD API + lifecycle endpoints: publish, close, award, cancel.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app.core import generate_auction_number
 from app.core.notification_service import send_email_notification, send_whatsapp_notification
+from app.core.websocket_manager import manager
 from app.core.exceptions import (
     NotFoundException, BadRequestException, ForbiddenException
 )
@@ -31,6 +32,23 @@ from app.schemas.auth import MessageResponse
 router = APIRouter(prefix="/api/auctions", tags=["Auctions"])
 
 
+def check_auction_expiry(auction: Auction, db: Session) -> bool:
+    """Helper to check if a live auction has passed its closing time and auto-close it."""
+    if auction.status in ("live", "published") and auction.closing_time:
+        closing = auction.closing_time.replace(tzinfo=timezone.utc) if auction.closing_time.tzinfo is None else auction.closing_time
+        now = datetime.now(timezone.utc)
+        if closing <= now:
+            auction.status = AuctionStatus.CLOSED.value
+            db.commit()
+            return True
+    return False
+
+
+def make_utc(dt):
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
 def auction_to_response(auction: Auction, db: Session) -> AuctionResponse:
     creator = db.query(User).filter(User.id == auction.created_by).first()
     return AuctionResponse(
@@ -49,11 +67,11 @@ def auction_to_response(auction: Auction, db: Session) -> AuctionResponse:
         vehicle_width=auction.vehicle_width,
         material_type=auction.material_type,
         expected_weight=auction.expected_weight,
-        loading_date=auction.loading_date,
+        loading_date=make_utc(auction.loading_date),
         reporting_time=auction.reporting_time,
         unloading_point=auction.unloading_point,
-        start_time=auction.start_time,
-        closing_time=auction.closing_time,
+        start_time=make_utc(auction.start_time),
+        closing_time=make_utc(auction.closing_time),
         reserve_price=float(auction.reserve_price) if auction.reserve_price else None,
         bid_type=auction.bid_type,
         special_instructions=auction.special_instructions,
@@ -61,7 +79,7 @@ def auction_to_response(auction: Auction, db: Session) -> AuctionResponse:
         status=auction.status,
         auto_notify=auction.auto_notify,
         total_bids=auction.total_bids,
-        created_at=auction.created_at,
+        created_at=make_utc(auction.created_at),
     )
 
 
@@ -107,6 +125,10 @@ async def list_auctions(
         .all()
     )
 
+    # Auto-expire any live auctions past closing time
+    for a in auctions:
+        check_auction_expiry(a, db)
+
     return AuctionListResponse(
         auctions=[auction_to_response(a, db) for a in auctions],
         total=total,
@@ -124,6 +146,8 @@ async def get_auction(
     auction = db.query(Auction).filter(Auction.id == auction_id).first()
     if not auction:
         raise NotFoundException("Auction not found")
+
+    check_auction_expiry(auction, db)
 
     if current_user.role == "transporter":
         transporter = db.query(Transporter).filter(Transporter.user_id == current_user.id).first()
@@ -362,6 +386,12 @@ async def close_auction(
     auction.status = AuctionStatus.CLOSED.value
     db.commit()
 
+    await manager.send_auction_status(auction.id, "closed", {
+        "auction_id": auction.id,
+        "auction_number": auction.auction_number,
+        "status": "closed"
+    })
+
     log_audit(
         db, current_user.id, "CLOSE_AUCTION", "auction", auction.id,
         f"Closed auction {auction.auction_number}",
@@ -369,6 +399,44 @@ async def close_auction(
     )
 
     return MessageResponse(message=f"Auction {auction.auction_number} closed")
+
+
+@router.post("/{auction_id}/extend", response_model=MessageResponse)
+async def extend_auction(
+    auction_id: str,
+    request: Request,
+    minutes: int = Query(5, ge=1, le=120),
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    auction = db.query(Auction).filter(Auction.id == auction_id).first()
+    if not auction:
+        raise NotFoundException("Auction not found")
+
+    if auction.status not in ("live", "published"):
+        raise BadRequestException("Only live auctions can be extended")
+
+    now = datetime.now(timezone.utc)
+    closing = auction.closing_time.replace(tzinfo=timezone.utc) if auction.closing_time.tzinfo is None else auction.closing_time
+    base_time = max(closing, now)
+    new_closing = base_time + timedelta(minutes=minutes)
+    auction.closing_time = new_closing
+    db.commit()
+
+    await manager.send_auction_status(auction.id, "extended", {
+        "auction_id": auction.id,
+        "closing_time": new_closing.isoformat(),
+        "extended_by_minutes": minutes,
+    })
+
+    log_audit(
+        db, current_user.id, "EXTEND_AUCTION", "auction", auction.id,
+        f"Extended auction {auction.auction_number} by {minutes} minutes",
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return MessageResponse(message=f"Auction {auction.auction_number} extended by {minutes} minutes")
+
 
 
 @router.post("/{auction_id}/award", response_model=MessageResponse)
@@ -383,31 +451,97 @@ async def award_auction(
     if not auction:
         raise NotFoundException("Auction not found")
 
-    if auction.status != "closed":
+    if auction.status not in ("closed", "awarded"):
         raise BadRequestException("Only closed auctions can be awarded")
 
     existing = db.query(AuctionResult).filter(AuctionResult.auction_id == auction_id).first()
     if existing:
-        raise BadRequestException("Auction already awarded")
+        # Update existing decision
+        existing.winner_id = data.transporter_id
+        existing.winning_amount = data.amount
+        existing.award_status = data.award_status
+        existing.remarks = data.remarks
+        result = existing
+    else:
+        result = AuctionResult(
+            auction_id=auction_id,
+            winner_id=data.transporter_id,
+            awarded_by=current_user.id,
+            winning_amount=data.amount,
+            award_status=data.award_status,
+            remarks=data.remarks,
+            is_published=data.publish_now,
+        )
+        db.add(result)
 
-    result = AuctionResult(
-        auction_id=auction_id,
-        winner_id=data.transporter_id,
-        awarded_by=current_user.id,
-        winning_amount=data.amount,
-        award_status=data.award_status,
-        remarks=data.remarks,
+    if data.publish_now:
+        result.is_published = True
+        auction.status = AuctionStatus.AWARDED.value
+        winner = db.query(Transporter).filter(Transporter.id == data.transporter_id).first()
+        if winner:
+            winner.total_wins += 1
+            message_text = f"You have won auction {auction.auction_number} with bid amount ₹{data.amount:,.2f}. Route: {auction.pickup_location} to {auction.destination}."
+            notification = Notification(
+                user_id=winner.user_id,
+                title=f"Congratulations! Auction {auction.auction_number} Awarded",
+                message=message_text,
+                type="winner",
+                reference_id=auction.id,
+                reference_type="auction",
+            )
+            db.add(notification)
+
+            t_user = db.query(User).filter(User.id == winner.user_id).first()
+            if t_user:
+                if t_user.email:
+                    send_email_notification(t_user.email, f"Congratulations! You won Auction: {auction.auction_number}", message_text)
+                if t_user.phone:
+                    send_whatsapp_notification(t_user.phone, f"Congratulations! You won TRAMS Auction: {auction.auction_number}\nAmount: ₹{data.amount:,.2f}")
+
+        await manager.send_auction_status(auction.id, "awarded", {
+            "auction_id": auction.id,
+            "winner_id": result.winner_id,
+            "winning_amount": float(result.winning_amount),
+            "is_published": True,
+        })
+
+    db.commit()
+
+    log_audit(
+        db, current_user.id, "AWARD_AUCTION", "auction", auction.id,
+        f"Saved award decision for auction {auction.auction_number} (published: {data.publish_now})",
+        ip_address=request.client.host if request.client else None,
     )
-    db.add(result)
 
+    msg = f"Auction {auction.auction_number} result published to transporters!" if data.publish_now else f"Auction {auction.auction_number} award decision saved as draft."
+    return MessageResponse(message=msg)
+
+
+@router.post("/{auction_id}/publish-result", response_model=MessageResponse)
+async def publish_auction_result(
+    auction_id: str,
+    request: Request,
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    auction = db.query(Auction).filter(Auction.id == auction_id).first()
+    if not auction:
+        raise NotFoundException("Auction not found")
+
+    result = db.query(AuctionResult).filter(AuctionResult.auction_id == auction_id).first()
+    if not result:
+        raise BadRequestException("No award decision found to publish. Please select a winner first.")
+
+    if result.is_published:
+        raise BadRequestException("Auction result is already published")
+
+    result.is_published = True
     auction.status = AuctionStatus.AWARDED.value
 
-    # Update transporter stats
-    winner = db.query(Transporter).filter(Transporter.id == data.transporter_id).first()
+    winner = db.query(Transporter).filter(Transporter.id == result.winner_id).first()
     if winner:
         winner.total_wins += 1
-        # Notify winner
-        message_text = f"You have won auction {auction.auction_number} with bid amount ₹{data.amount:,.2f}. Route: {auction.pickup_location} to {auction.destination}."
+        message_text = f"You have won auction {auction.auction_number} with bid amount ₹{float(result.winning_amount):,.2f}. Route: {auction.pickup_location} to {auction.destination}."
         notification = Notification(
             user_id=winner.user_id,
             title=f"Congratulations! Auction {auction.auction_number} Awarded",
@@ -418,30 +552,30 @@ async def award_auction(
         )
         db.add(notification)
 
-        # Send email and WhatsApp
-        w_user = db.query(User).filter(User.id == winner.user_id).first()
-        if w_user:
-            if w_user.email:
-                send_email_notification(
-                    w_user.email,
-                    f"Congratulations! You won Auction: {auction.auction_number}",
-                    message_text
-                )
-            if w_user.phone:
-                send_whatsapp_notification(
-                    w_user.phone,
-                    f"Congratulations! You won TRAMS Auction: {auction.auction_number}\nAmount: ₹{data.amount:,.2f}\nRoute: {auction.pickup_location} to {auction.destination}"
-                )
+        t_user = db.query(User).filter(User.id == winner.user_id).first()
+        if t_user:
+            if t_user.email:
+                send_email_notification(t_user.email, f"Congratulations! You won Auction: {auction.auction_number}", message_text)
+            if t_user.phone:
+                send_whatsapp_notification(t_user.phone, f"Congratulations! You won TRAMS Auction: {auction.auction_number}\nAmount: ₹{float(result.winning_amount):,.2f}")
 
     db.commit()
 
+    await manager.send_auction_status(auction.id, "awarded", {
+        "auction_id": auction.id,
+        "winner_id": result.winner_id,
+        "winner_company": winner.company_name if winner else None,
+        "winning_amount": float(result.winning_amount),
+        "is_published": True,
+    })
+
     log_audit(
-        db, current_user.id, "AWARD_AUCTION", "auction", auction.id,
-        f"Awarded auction {auction.auction_number} to transporter {data.transporter_id}",
+        db, current_user.id, "PUBLISH_AUCTION_RESULT", "auction", auction.id,
+        f"Published award result for auction {auction.auction_number}",
         ip_address=request.client.host if request.client else None,
     )
 
-    return MessageResponse(message=f"Auction {auction.auction_number} awarded successfully")
+    return MessageResponse(message=f"Award result for auction {auction.auction_number} officially published to transporters!")
 
 
 @router.post("/{auction_id}/cancel", response_model=MessageResponse)

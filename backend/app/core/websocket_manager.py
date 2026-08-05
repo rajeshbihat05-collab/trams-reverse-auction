@@ -53,8 +53,7 @@ class ConnectionManager:
         """
         Send bid updates with role-based filtering:
         - Admin sees full bid details (transporter name, amount, all bids)
-        - Transporters see only their own bid confirmation
-        - Other transporters see only 'new bid received' without details
+        - Transporters see their own confirmation, current lowest bid benchmark, and activity notification.
         """
         if auction_id not in self.active_connections:
             return
@@ -77,15 +76,19 @@ class ConnectionManager:
                             "amount": bid_data.get("amount"),
                             "revision": bid_data.get("revision_number"),
                             "submitted_at": bid_data.get("submitted_at"),
+                            "lowest_bid": bid_data.get("lowest_bid"),
+                            "rank": bid_data.get("rank"),
+                            "total_bids": bid_data.get("total_bids", 0),
                         },
                     })
                 else:
-                    # Other transporters only see that a new bid happened
+                    # Other transporters see that a new bid was placed and updated lowest rate
                     await ws.send_json({
                         "type": "bid_activity",
                         "data": {
                             "message": "A new bid has been submitted",
                             "total_bids": bid_data.get("total_bids", 0),
+                            "lowest_bid": bid_data.get("lowest_bid"),
                         },
                     })
             except Exception:

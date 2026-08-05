@@ -28,9 +28,18 @@ class UserInfo(BaseModel):
     avatar_url: Optional[str] = None
     transporter_id: Optional[str] = None
     company_name: Optional[str] = None
+    must_change_password: bool = False
 
     class Config:
         from_attributes = True
+
+
+class ForceChangePasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=6)
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: Optional[str] = Field(None, min_length=6)
 
 
 class RegisterRequest(BaseModel):

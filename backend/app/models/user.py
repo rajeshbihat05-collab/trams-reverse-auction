@@ -39,6 +39,7 @@ class User(Base):
     phone = Column(String(20), nullable=True)
     role = Column(String(20), nullable=False, default=UserRole.TRANSPORTER.value)
     is_active = Column(Boolean, default=True, nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)
     last_login = Column(DateTime, nullable=True)
     otp_code = Column(String(10), nullable=True)
     otp_expiry = Column(DateTime, nullable=True)

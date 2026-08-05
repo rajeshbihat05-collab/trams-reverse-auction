@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.database import get_db
+from app.core import hash_password
 from app.core.exceptions import NotFoundException, ConflictException
 from app.dependencies import get_current_user, get_admin_user, log_audit
 from app.models.user import User
@@ -18,7 +19,7 @@ from app.schemas.transporter import (
     VehicleCreate, VehicleUpdate, VehicleResponse, VehicleListResponse,
     DriverCreate, DriverUpdate, DriverResponse, DriverListResponse
 )
-from app.schemas.auth import MessageResponse
+from app.schemas.auth import MessageResponse, AdminResetPasswordRequest
 
 router = APIRouter(prefix="/api/transporters", tags=["Transporters"])
 
@@ -162,6 +163,38 @@ async def verify_transporter(
     )
 
     return MessageResponse(message=f"Transporter {t.company_name} verified")
+
+
+@router.post("/{transporter_id}/reset-password", response_model=MessageResponse)
+async def reset_transporter_password(
+    transporter_id: str,
+    data: AdminResetPasswordRequest,
+    request: Request,
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    t = db.query(Transporter).filter(Transporter.id == transporter_id).first()
+    if not t:
+        raise NotFoundException("Transporter not found")
+
+    user = db.query(User).filter(User.id == t.user_id).first()
+    if not user:
+        raise NotFoundException("User account not found")
+
+    temp_password = data.new_password or "TempPass@123"
+    user.password_hash = hash_password(temp_password)
+    user.must_change_password = True
+    db.commit()
+
+    log_audit(
+        db, current_user.id, "RESET_TRANSPORTER_PASSWORD", "transporter", t.id,
+        f"Admin reset password for transporter {t.company_name} ({user.email})",
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return MessageResponse(
+        message=f"Temporary password set to '{temp_password}' for {t.company_name}. Transporter must set a new personal password on next login."
+    )
 
 
 # =================== Vehicles ===================

@@ -44,11 +44,22 @@ export default function AuctionCreate() {
         setRoutes(rRes.data);
         setMaterials(mRes.data);
         setTransporters(tRes.data);
+
+        // Auto preselect all transporters by default for maximum bidding participation
+        if (tRes.data && tRes.data.length > 0) {
+          setSelectedTransporters(tRes.data.map(t => t.id));
+        }
       } catch (err) {
         console.error(err);
       }
     };
     fetchMasters();
+
+    // Default closing time: 1 hour from now
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    const localISOTime = new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    setClosingTime(localISOTime);
   }, []);
 
   const handleRouteSelect = (routeId) => {
@@ -83,10 +94,10 @@ export default function AuctionCreate() {
         vehicle_width: vehicleWidth || null,
         material_type: materialType,
         expected_weight: expectedWeight ? parseFloat(expectedWeight) : null,
-        loading_date: new Date(loadingDate).toISOString(),
-        reporting_time: reportingTime,
+        loading_date: (loadingDate && !isNaN(new Date(loadingDate).getTime())) ? new Date(loadingDate).toISOString() : null,
+        reporting_time: reportingTime || null,
         unloading_point: unloadingPoint || null,
-        closing_time: new Date(closingTime).toISOString(),
+        closing_time: (closingTime && !isNaN(new Date(closingTime).getTime())) ? new Date(closingTime).toISOString() : new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         reserve_price: reservePrice ? parseFloat(reservePrice) : null,
         special_instructions: specialInstructions || null,
         terms_conditions: termsConditions || null,
@@ -97,8 +108,16 @@ export default function AuctionCreate() {
       await api.post('/auctions', payload);
       navigate('/admin/auctions');
     } catch (err) {
-      console.error(err);
-      alert('Error creating auction');
+      console.error('Create Auction Error:', err);
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        const msg = detail.map(d => `${d.loc?.slice(-1)[0]}: ${d.msg}`).join('\n');
+        alert(`Validation Error:\n${msg}`);
+      } else if (typeof detail === 'string') {
+        alert(`Error: ${detail}`);
+      } else {
+        alert(err.message || 'Error creating auction. Please check required fields.');
+      }
     } finally {
       setLoading(false);
     }

@@ -2,7 +2,7 @@
 Bid API endpoints: submit, update, get bids, get auction results.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
@@ -51,10 +51,12 @@ async def submit_bid(
         raise AuctionClosedException()
 
     now = datetime.now(timezone.utc)
-    if auction.closing_time and auction.closing_time.replace(tzinfo=timezone.utc) < now:
-        auction.status = "closed"
-        db.commit()
-        raise AuctionClosedException()
+    if auction.closing_time:
+        closing = auction.closing_time.replace(tzinfo=timezone.utc) if auction.closing_time.tzinfo is None else auction.closing_time
+        if closing <= now:
+            auction.status = "closed"
+            db.commit()
+            raise AuctionClosedException()
 
     invite = db.query(AuctionInvite).filter(
         AuctionInvite.auction_id == data.auction_id,
@@ -69,7 +71,7 @@ async def submit_bid(
             f"Bid amount cannot exceed reserve price of ₹{float(auction.reserve_price):,.2f}"
         )
 
-    # Check for existing bid
+    # Check for existing bid (Reverse Auction Rule: Must be strictly lower than previous bid)
     existing_bid = db.query(Bid).filter(
         Bid.auction_id == data.auction_id,
         Bid.transporter_id == transporter.id,
@@ -77,6 +79,11 @@ async def submit_bid(
     ).first()
 
     if existing_bid:
+        if data.amount >= float(existing_bid.amount):
+            raise BadRequestException(
+                f"In a reverse auction, your new bid (₹{data.amount:,.2f}) must be lower than your previous active rate (₹{float(existing_bid.amount):,.2f})"
+            )
+
         # Update existing bid
         old_amount = float(existing_bid.amount)
         history = BidHistory(
@@ -118,10 +125,39 @@ async def submit_bid(
 
         invite.status = "participated"
 
+    # Anti-Sniping Check: if bid submitted within 2 minutes (120s) of closing time, auto extend by 3 minutes
+    if auction.closing_time:
+        closing = auction.closing_time.replace(tzinfo=timezone.utc) if auction.closing_time.tzinfo is None else auction.closing_time
+        time_left_secs = (closing - now).total_seconds()
+        if 0 < time_left_secs < 120:
+            new_closing = now + timedelta(minutes=3)
+            auction.closing_time = new_closing
+            db.flush()
+            await manager.send_auction_status(auction.id, "extended", {
+                "auction_id": auction.id,
+                "closing_time": new_closing.isoformat(),
+                "extended_by_minutes": 3,
+                "reason": "Anti-sniping auto-extension"
+            })
+
     db.commit()
     db.refresh(bid)
 
-    # Notify admin via WebSocket
+    # Calculate current rankings and lowest bid for WebSocket update
+    all_bids = (
+        db.query(Bid)
+        .filter(Bid.auction_id == auction.id, Bid.is_latest == True)
+        .order_by(Bid.amount.asc())
+        .all()
+    )
+    lowest_bid = float(all_bids[0].amount) if all_bids else float(bid.amount)
+    rank = 1
+    for idx, b in enumerate(all_bids, 1):
+        if b.transporter_id == transporter.id:
+            rank = idx
+            break
+
+    # Notify via WebSocket
     bid_data = {
         "bid_id": bid.id,
         "auction_id": auction.id,
@@ -132,6 +168,8 @@ async def submit_bid(
         "revision_number": bid.revision_number,
         "submitted_at": bid.submitted_at.isoformat(),
         "total_bids": auction.total_bids,
+        "lowest_bid": lowest_bid,
+        "rank": rank,
     }
 
     await manager.send_bid_update(auction.id, bid_data, transporter.id)
